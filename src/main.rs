@@ -26,11 +26,23 @@ impl Commands {
     fn run(&self) -> () {
         match self {
             Commands::CountEntities { to_blueprint, file } => {
-                assert!(!to_blueprint, "--to-blueprint not supported yet");
                 let file = std::fs::read_to_string(file.as_ref().expect("file required"))
                     .expect("read file");
                 let json = blueprint::blueprint_to_json(&file);
-                dbg!(blueprint::count_entities::count(&json));
+                let counts = blueprint::count_entities::count(&json);
+                if *to_blueprint {
+                    let mut counts = counts
+                        .into_iter()
+                        .map(|(name, count)| (name, i64::try_from(count).unwrap()))
+                        .collect::<Vec<_>>();
+                    counts.sort_by_key(|(_name, count)| -count);
+                    dbg!(&counts);
+                    let combinator = blueprint::make_constant_combinator_json(counts);
+                    let bp = blueprint::json_to_blueprint(combinator);
+                    println!("{bp}");
+                } else {
+                    println!("{counts:?}");
+                }
             }
         }
     }
