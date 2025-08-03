@@ -20,8 +20,16 @@ pub(crate) fn count(json: &str) -> BTreeMap<String, u64> {
     let top = serde_json::from_str::<Top>(json).unwrap();
     let mut result = BTreeMap::<String, u64>::new();
     for entity in top.blueprint.entities {
-        let entry = result.entry(entity.name).or_insert(0);
-        *entry = entry.checked_add(1).unwrap();
+        let name = entity.name;
+        let (name, count) = match name.as_ref() {
+            "curved-rail-a" => ("rail".to_string(), 3),
+            "curved-rail-b" => ("rail".to_string(), 3),
+            "half-diagonal-rail" => ("rail".to_string(), 2),
+            "straight-rail" => ("rail".to_string(), 1),
+            _ => (name, 1),
+        };
+        let entry = result.entry(name).or_insert(0);
+        *entry = entry.checked_add(count).unwrap();
     }
     result
 }
@@ -38,8 +46,7 @@ mod tests {
             ("arithmetic-combinator", 9),
             ("big-electric-pole", 5),
             ("constant-combinator", 9),
-            ("curved-rail-a", 18),
-            ("curved-rail-b", 18),
+            ("rail", 250),
             ("fast-inserter", 46),
             ("iron-chest", 2),
             ("medium-electric-pole", 11),
@@ -50,13 +57,24 @@ mod tests {
             ("small-lamp", 19),
             ("splitter", 1),
             ("storage-chest", 43),
-            ("straight-rail", 142),
             ("train-stop", 2),
             ("transport-belt", 13),
         ]
         .into_iter()
         .map(|(k, v)| (k.to_owned(), v))
         .collect::<BTreeMap<String, u64>>();
+        assert_eq!(counts, expected);
+    }
+
+    #[test]
+    fn test_count_rails() {
+        let bp = r"0eNqdlt2OgjAQhd+l15jQTn+AV9lsNihdbYJlA2jWGN99qwKbxXGdckWA9sthOucwZ7auD/ardb5nxZm5TeM7VrydWee2vqyvz3y5t6xgbelqdkmY85X9ZgW/vCfM+t71zt533G5OH/6wX9s2LEjGnZtDe7TV6gpYlSxhX00XdjX+Cg+klcgSdgpXDQFfudZu7m+5uCQPWEHHShyrESqg1DVCBRionCBWkrE8x7GYWEUXa+5UZf5SMa2arlVNVIRjyAfE+cDJZqVMEWw2YXdl/bmqXLltQoPe6NjhjxoB05hPsK4PgO2uf8qB/zg8jVTFJ9rL8+B0A8HQPEoQsCJS8thChMbkQK+rxiWjWEnHphGVUHGVGC06r4TE2JruAoiQbJZgMVBGL+nQADInfDbdWGM1KViRRltBzjIlw7B8mRWkIUgWy5przsb8ICC6CyQlYoWMtq/Ur5tWqGXRLRWBraOTPGAxkFmW5E9oWXRizSuJHnwe/eeX8NoHkEb/+udYtJ+AR09VMEsDjnkLRPRYBYSUAYieWMFQ5MrokRUeEiYM2663+8D4ndcTdrRtd1ugtMhlnisDCqQJkf8DcPXVjw==";
+        let json = crate::blueprint::blueprint_to_json(bp);
+        let counts = count(&json);
+        let expected = [("rail", 78)]
+            .into_iter()
+            .map(|(k, v)| (k.to_owned(), v))
+            .collect::<BTreeMap<String, u64>>();
         assert_eq!(counts, expected);
     }
 }
