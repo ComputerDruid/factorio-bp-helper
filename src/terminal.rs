@@ -1,4 +1,4 @@
-use std::io::{stderr, stdout};
+use std::io::stderr;
 
 use crossterm::event::{DisableBracketedPaste, EnableBracketedPaste, KeyCode, KeyModifiers};
 
@@ -27,7 +27,7 @@ pub fn prompt_blueprint() -> String {
             _ => {}
         }
     };
-    crossterm::execute!(stdout(), DisableBracketedPaste).unwrap();
+    crossterm::execute!(stderr(), DisableBracketedPaste).unwrap();
     crossterm::terminal::disable_raw_mode().unwrap();
     blueprint_string.unwrap_or_else(|| std::process::exit(1))
 }
