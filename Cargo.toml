@@ -3,6 +3,7 @@ name = "factorio-bp-helper"
 version = "0.1.0"
 edition = "2024"
 repository = "https://github.com/ComputerDruid/factorio-bp-helper"
+license = "MIT OR Apache-2.0"
 
 [dependencies]
 base64 = "0.22.1"
