@@ -1,6 +1,9 @@
 mod blueprint;
 
+use std::io::stderr;
+
 use clap::{Parser, Subcommand};
+use crossterm::clipboard::CopyToClipboard;
 
 /// Collection of factorio blueprint helpers
 #[derive(Parser, Debug)]
@@ -17,18 +20,31 @@ enum Commands {
         /// Outputs the counts as a blueprint of a constant combinator
         #[arg(long)]
         to_blueprint: bool,
-
-        file: Option<String>,
+        /// Sends the output to the clipboard
+        #[arg(long)]
+        to_clipboard: bool,
+        blueprint_string: Option<String>,
     },
 }
+
+mod terminal;
 
 impl Commands {
     fn run(&self) -> () {
         match self {
-            Commands::CountEntities { to_blueprint, file } => {
-                let file = std::fs::read_to_string(file.as_ref().expect("file required"))
-                    .expect("read file");
-                let json = blueprint::blueprint_to_json(&file);
+            Commands::CountEntities {
+                to_blueprint,
+                to_clipboard,
+                blueprint_string,
+            } => {
+                let maybe_string: String;
+                let blueprint_string = if let Some(blueprint_string) = blueprint_string {
+                    blueprint_string
+                } else {
+                    maybe_string = terminal::prompt_blueprint();
+                    &maybe_string
+                };
+                let json = blueprint::blueprint_to_json(&blueprint_string);
                 let counts = blueprint::count_entities::count(&json);
                 if *to_blueprint {
                     let mut counts = counts
@@ -36,12 +52,26 @@ impl Commands {
                         .map(|(name, count)| (name, i64::try_from(count).unwrap()))
                         .collect::<Vec<_>>();
                     counts.sort_by_key(|(_name, count)| -count);
-                    dbg!(&counts);
                     let combinator = blueprint::make_constant_combinator_json(counts);
                     let bp = blueprint::json_to_blueprint(combinator);
-                    println!("{bp}");
+                    if *to_clipboard {
+                        crossterm::execute!(stderr(), CopyToClipboard::to_clipboard_from(bp))
+                            .unwrap();
+                        println!("blueprint copied to clipboard.")
+                    } else {
+                        println!("{bp}");
+                    }
                 } else {
-                    println!("{counts:?}");
+                    if *to_clipboard {
+                        crossterm::execute!(
+                            stderr(),
+                            CopyToClipboard::to_clipboard_from(format!("{counts:?}"))
+                        )
+                        .unwrap();
+                        println!("counts copied to clipboard.");
+                    } else {
+                        println!("{counts:?}");
+                    }
                 }
             }
         }
