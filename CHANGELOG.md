@@ -1,6 +1,9 @@
 ## Unreleased
 
-- Add blueprint prompt and response to give better feedback when pasting a blueprint.
+## Version 0.1.1
+
+### Changed
+- When prompting for a blueprint, there's now a `🟦❯` prompt and a `received.` response when pasting a blueprint to give better feedback.
 
 ## Version 0.1.0
 
