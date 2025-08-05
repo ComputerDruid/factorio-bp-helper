@@ -3,12 +3,58 @@ use std::collections::BTreeMap;
 use serde::Deserialize;
 #[derive(Deserialize)]
 struct Top {
-    blueprint: Blueprint,
+    #[serde(rename = "blueprint")]
+    blueprint: Option<Blueprint>,
+    #[serde(rename = "blueprint_book")]
+    book: Option<BlueprintBook>,
+}
+
+impl Top {
+    fn count(self) -> BTreeMap<String, u64> {
+        let mut result = if let Some(blueprint) = self.blueprint {
+            blueprint.count()
+        } else {
+            BTreeMap::new()
+        };
+        if let Some(BlueprintBook { blueprints }) = self.book {
+            for bp in blueprints {
+                let counts = bp.count();
+                for (name, count) in counts {
+                    *result.entry(name).or_insert(0) += count
+                }
+            }
+        }
+        result
+    }
 }
 
 #[derive(Deserialize)]
 struct Blueprint {
     entities: Vec<Entity>,
+}
+
+#[derive(Deserialize)]
+struct BlueprintBook {
+    blueprints: Vec<Top>,
+}
+
+impl Blueprint {
+    fn count(self) -> BTreeMap<String, u64> {
+        let mut result = BTreeMap::<String, u64>::new();
+        for entity in self.entities {
+            let name = entity.name;
+            let (name, count) = match name.as_ref() {
+                "curved-rail-a" => ("rail".to_string(), 3),
+                "curved-rail-b" => ("rail".to_string(), 3),
+                "half-diagonal-rail" => ("rail".to_string(), 2),
+                "straight-rail" => ("rail".to_string(), 1),
+                _ => (name, 1),
+            };
+            let entry = result.entry(name).or_insert(0);
+            *entry = entry.checked_add(count).unwrap();
+        }
+        result
+    }
 }
 
 #[derive(Deserialize)]
@@ -18,20 +64,7 @@ struct Entity {
 
 pub(crate) fn count(json: &str) -> BTreeMap<String, u64> {
     let top = serde_json::from_str::<Top>(json).unwrap();
-    let mut result = BTreeMap::<String, u64>::new();
-    for entity in top.blueprint.entities {
-        let name = entity.name;
-        let (name, count) = match name.as_ref() {
-            "curved-rail-a" => ("rail".to_string(), 3),
-            "curved-rail-b" => ("rail".to_string(), 3),
-            "half-diagonal-rail" => ("rail".to_string(), 2),
-            "straight-rail" => ("rail".to_string(), 1),
-            _ => (name, 1),
-        };
-        let entry = result.entry(name).or_insert(0);
-        *entry = entry.checked_add(count).unwrap();
-    }
-    result
+    top.count()
 }
 
 #[cfg(test)]
@@ -75,6 +108,25 @@ mod tests {
             .into_iter()
             .map(|(k, v)| (k.to_owned(), v))
             .collect::<BTreeMap<String, u64>>();
+        assert_eq!(counts, expected);
+    }
+
+    #[test]
+    fn test_count_book() {
+        let bp = "0eNrtWF2PoyAU/S8866SiaO1fmTSNH2SGVMFF7U4z8b/vpe62pisK0sdJ5mEUOOdyuedy7DfKq542kvHulAtxRofvx5sWHd4nj2qMFYKPr1v2wbNKveNZTdEB0a9G0rb1O5nxthGy83NadWjwEOMl/UKHYPBmlnW9zIV+ER6OHqK8Yx2jI/Ht4XrifZ1TCajeIpKHGtHCYsEVJwD6ePdGPHQF6PSNAFHJJC3GCZGK8Akf2+IHeyv80Bo/tcKPrPFjK3xijZ9Y4cebzzcMAH8GMdmOuJtH3HsrIliokluUq1lINzCk06hXGYKdyybMKAKXXWhOM8AbQBOr5AfhBorYjiJy2YVZ9onLLswoHMQaao7XQa1YA+kkV12cqQuoJlK8cxGMJlLspEJdpE4qxEYXcehCoUtG5CKK0ChuJ93NpAYMEetoDXgPa+ahC5XtbQKJcRqlKUlCEkYJflipnQrO1M1lbUvrvGL8w6+z4pNx6ofA8qvPKtgcTOh5IeoaCNcM3qovtLB4pgmMMPmbQD/cP2dwv+jyzCniO4Wl0dtCsZ+v30f55n119hlvqexgYAYr0Ycb4EVjVwmogs8MTqs0ZNjbOTtNsf1HkD4RzFSjh4CTNQq175ga9duCUV5Qv8mK83389FjLhayhYkdVjQXIykkBN1KUPezjosBq+L9S4Q33+TCdnxi/wPaEvI7rH09wQm2nmEf9zY4E2hGsHQmH4wB/S/Z2rSSUNbGpYPt7M1L9y6rqUicOjUo2eNtpB0lMOkjg1qViIw63NpVosuPWmWIN6qbWFBsVycTK1rRkfe3TChZIVviNqOgyhS4L8RbdxEa2OLENd8KQvMzEToWSvMzFTlHjl9nYqTSI0QXuJr/IiMNNfkSTHTf5RavG1v76Jpa+1v7+Jj/3t+7+xrGTBnX1kDih3moXbPpvqAmV4ndowcSDxkaOWz9HgrkPGf/2I7SHMnVe9PTvy2UBb/gD/vaEEw==";
+        let json = crate::blueprint::blueprint_to_json(bp);
+        let counts = count(&json);
+        let expected = [
+            ("assembling-machine-3", 2),
+            ("bulk-inserter", 4),
+            ("express-transport-belt", 33),
+            ("long-handed-inserter", 2),
+            ("medium-electric-pole", 2),
+            ("turbo-transport-belt", 9),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.to_owned(), v))
+        .collect::<BTreeMap<String, u64>>();
         assert_eq!(counts, expected);
     }
 }
