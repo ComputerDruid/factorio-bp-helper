@@ -1,5 +1,7 @@
 ## Unreleased
 
+## Version 0.1.2
+
 ### Added
 - Added support for blueprint books in `count-entities`. Ingredients will be summed across all the blueprints in the blueprint book.
 
