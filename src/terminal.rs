@@ -6,6 +6,8 @@ pub fn prompt_blueprint() -> String {
     crossterm::execute!(stderr(), EnableBracketedPaste).unwrap();
     crossterm::terminal::enable_raw_mode().unwrap();
     eprint!("Paste blueprint:\r\n");
+    const PROMPT: &str = "🟦❯ ";
+    eprint!("{}", PROMPT);
     let mut warned = false;
     let blueprint_string = loop {
         let event = crossterm::event::read().unwrap();
@@ -14,14 +16,17 @@ pub fn prompt_blueprint() -> String {
                 if key_event.code == KeyCode::Char('c')
                     && key_event.modifiers == KeyModifiers::CONTROL
                 {
+                    eprint!("\r\n");
                     break None;
                 }
                 if !warned {
                     warned = true;
-                    eprint!("\r\nWARN: Only pasting works.\r\n")
+                    eprint!("\rWARN: Only pasting works.\r\n");
+                    eprint!("{}", PROMPT);
                 }
             }
             crossterm::event::Event::Paste(s) => {
+                eprint!("received.\r\n");
                 break Some(s);
             }
             _ => {}
