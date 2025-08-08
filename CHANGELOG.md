@@ -1,5 +1,8 @@
 ## Unreleased
 
+### Fixed
+- `count-entities` fixed to understand different qualities.
+
 ## Version 0.1.2
 
 ### Added

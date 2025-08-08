@@ -1,5 +1,8 @@
 pub(crate) mod count_entities;
-use std::io::Read;
+use std::{
+    fmt::{Debug, Display},
+    io::Read,
+};
 
 use base64::{Engine, prelude::BASE64_STANDARD};
 use flate2::Compression;
@@ -38,23 +41,32 @@ pub fn json_to_blueprint(value: serde_json::Value) -> String {
     result
 }
 
-pub fn make_constant_combinator_json(signals: Vec<(String, i64)>) -> serde_json::Value {
+pub fn make_constant_combinator_json(signals: Vec<((String, Quality), i64)>) -> serde_json::Value {
     const COMBINATOR: &str = "0eNqNkNEOgjAMRf+lz8MIEYH9ijFmw6pNRkdGMRKyf3fDF5+Mj23uPbe3K1g34xiIBfQK1HueQJ9WmOjOxuWdLCOCBhIcQAGbIU9ZJ4al6P1giY34AFEB8RVfoMt4VoAsJIQf3DYsF54HiyEJfoIUjH5KXs85P/GK+ljvagUL6OpY7uqUdKWA/UdyUJkiwbuLxYd5UkIk342cYPirjQTD0+iDFBad5CK9n/NHyu9KMbfajPrrawqeKWU7pGrLQ9NVTVt1zb7tYnwDHB11ag==";
     let json = blueprint_to_json(COMBINATOR);
     let mut value = serde_json::from_str::<serde_json::Value>(&json)
         .expect("constant combinator should be a valid blueprint");
     let new_filters = signals
-        .iter()
+        .into_iter()
         .enumerate()
-        .map(|(idx, (item_name, count))| {
-            json!({
+        .map(|(idx, ((item_name, quality), count))| {
+            let mut signal = json!({
+                "type": "item",
+                "name": item_name,
+            });
+            if let Some(quality) = quality.0 {
+                signal
+                    .as_object_mut()
+                    .unwrap()
+                    .insert("quality".to_owned(), json!(quality));
+            }
+
+            let filter = json!({
                 "index": idx + 1,
                 "count": count,
-                "signal": {
-                    "type": "item",
-                    "name": item_name,
-                }
-            })
+                "signal": signal,
+            });
+            filter
         })
         .collect::<Vec<_>>();
     let entities = value
@@ -76,4 +88,32 @@ pub fn make_constant_combinator_json(signals: Vec<(String, i64)>) -> serde_json:
         .unwrap();
     *filters = new_filters;
     value
+}
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Quality(pub Option<String>);
+
+impl Debug for Quality {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Debug::fmt(&self.0, f)
+    }
+}
+
+impl Quality {
+    pub fn fmt_suffix(&self) -> impl Display {
+        struct FromFn<T>(T);
+        impl<T: Fn(&mut std::fmt::Formatter<'_>) -> std::fmt::Result> Display for FromFn<T> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                (self.0)(f)
+            }
+        }
+        // someday, we can replace this with `std::fmt::from_fn`
+        FromFn(|f: &mut std::fmt::Formatter<'_>| {
+            if let Some(quality) = &self.0 {
+                write!(f, " ({quality})")
+            } else {
+                Ok(())
+            }
+        })
+    }
 }

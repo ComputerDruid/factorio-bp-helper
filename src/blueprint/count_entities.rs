@@ -1,6 +1,9 @@
 use std::collections::BTreeMap;
 
 use serde::Deserialize;
+
+use super::Quality;
+
 #[derive(Deserialize)]
 struct Top {
     #[serde(rename = "blueprint")]
@@ -10,7 +13,7 @@ struct Top {
 }
 
 impl Top {
-    fn count(self) -> BTreeMap<String, u64> {
+    fn count(self) -> BTreeMap<(String, Quality), u64> {
         let mut result = if let Some(blueprint) = self.blueprint {
             blueprint.count()
         } else {
@@ -19,8 +22,8 @@ impl Top {
         if let Some(BlueprintBook { blueprints }) = self.book {
             for bp in blueprints {
                 let counts = bp.count();
-                for (name, count) in counts {
-                    *result.entry(name).or_insert(0) += count
+                for (key, count) in counts {
+                    *result.entry(key).or_insert(0) += count
                 }
             }
         }
@@ -39,8 +42,8 @@ struct BlueprintBook {
 }
 
 impl Blueprint {
-    fn count(self) -> BTreeMap<String, u64> {
-        let mut result = BTreeMap::<String, u64>::new();
+    fn count(self) -> BTreeMap<(String, Quality), u64> {
+        let mut result = BTreeMap::<(String, Quality), u64>::new();
         for entity in self.entities {
             let name = entity.name;
             let (name, count) = match name.as_ref() {
@@ -50,7 +53,8 @@ impl Blueprint {
                 "straight-rail" => ("rail".to_string(), 1),
                 _ => (name, 1),
             };
-            let entry = result.entry(name).or_insert(0);
+            let quality = Quality(entity.quality);
+            let entry = result.entry((name, quality)).or_insert(0);
             *entry = entry.checked_add(count).unwrap();
         }
         result
@@ -60,9 +64,10 @@ impl Blueprint {
 #[derive(Deserialize)]
 struct Entity {
     name: String,
+    quality: Option<String>,
 }
 
-pub(crate) fn count(json: &str) -> BTreeMap<String, u64> {
+pub(crate) fn count(json: &str) -> BTreeMap<(String, Quality), u64> {
     let top = serde_json::from_str::<Top>(json).unwrap();
     top.count()
 }
@@ -94,8 +99,8 @@ mod tests {
             ("transport-belt", 13),
         ]
         .into_iter()
-        .map(|(k, v)| (k.to_owned(), v))
-        .collect::<BTreeMap<String, u64>>();
+        .map(|(k, v)| ((k.to_owned(), Quality(None)), v))
+        .collect::<BTreeMap<(String, Quality), u64>>();
         assert_eq!(counts, expected);
     }
 
@@ -106,8 +111,8 @@ mod tests {
         let counts = count(&json);
         let expected = [("rail", 78)]
             .into_iter()
-            .map(|(k, v)| (k.to_owned(), v))
-            .collect::<BTreeMap<String, u64>>();
+            .map(|(k, v)| ((k.to_owned(), Quality(None)), v))
+            .collect::<BTreeMap<(String, Quality), u64>>();
         assert_eq!(counts, expected);
     }
 
@@ -117,16 +122,16 @@ mod tests {
         let json = crate::blueprint::blueprint_to_json(bp);
         let counts = count(&json);
         let expected = [
-            ("assembling-machine-3", 2),
-            ("bulk-inserter", 4),
-            ("express-transport-belt", 33),
-            ("long-handed-inserter", 2),
-            ("medium-electric-pole", 2),
-            ("turbo-transport-belt", 9),
+            (("assembling-machine-3", Some("uncommon")), 2),
+            (("bulk-inserter", None), 4),
+            (("express-transport-belt", None), 33),
+            (("long-handed-inserter", None), 2),
+            (("medium-electric-pole", None), 2),
+            (("turbo-transport-belt", None), 9),
         ]
         .into_iter()
-        .map(|(k, v)| (k.to_owned(), v))
-        .collect::<BTreeMap<String, u64>>();
+        .map(|((name, quality), v)| ((name.to_owned(), Quality(quality.map(|q| q.to_owned()))), v))
+        .collect::<BTreeMap<(String, Quality), u64>>();
         assert_eq!(counts, expected);
     }
 }
