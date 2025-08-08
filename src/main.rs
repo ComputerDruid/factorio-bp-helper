@@ -1,6 +1,9 @@
 mod blueprint;
 
-use std::io::{Read, stderr, stdin};
+use std::{
+    fmt::Write as _,
+    io::{Read, stderr, stdin},
+};
 
 use blueprint::{blueprint_to_json, json_to_blueprint};
 use clap::{Parser, Subcommand};
@@ -50,12 +53,12 @@ impl Commands {
                 };
                 let json = blueprint::blueprint_to_json(&blueprint_string);
                 let counts = blueprint::count_entities::count(&json);
+                let mut counts = counts
+                    .into_iter()
+                    .map(|(key, count)| (key, i64::try_from(count).unwrap()))
+                    .collect::<Vec<_>>();
+                counts.sort_by_key(|(__key, count)| -count);
                 if to_blueprint {
-                    let mut counts = counts
-                        .into_iter()
-                        .map(|(name, count)| (name, i64::try_from(count).unwrap()))
-                        .collect::<Vec<_>>();
-                    counts.sort_by_key(|(_name, count)| -count);
                     let combinator = blueprint::make_constant_combinator_json(counts);
                     let bp = blueprint::json_to_blueprint(combinator);
                     if to_clipboard {
@@ -66,15 +69,25 @@ impl Commands {
                         println!("{bp}");
                     }
                 } else {
+                    let mut formatted = String::new();
+                    for ((name, quality), count) in counts {
+                        writeln!(
+                            formatted,
+                            "{count} {name}{quality}",
+                            quality = quality.fmt_suffix()
+                        )
+                        .expect("a Display implementation returned an error unexpectedly");
+                    }
+                    let formatted = formatted.trim_end();
                     if to_clipboard {
                         crossterm::execute!(
                             stderr(),
-                            CopyToClipboard::to_clipboard_from(format!("{counts:?}"))
+                            CopyToClipboard::to_clipboard_from(formatted)
                         )
                         .unwrap();
                         println!("counts copied to clipboard.");
                     } else {
-                        println!("{counts:?}");
+                        println!("{formatted}");
                     }
                 }
             }
