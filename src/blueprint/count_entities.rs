@@ -134,4 +134,23 @@ mod tests {
         .collect::<BTreeMap<(String, Quality), u64>>();
         assert_eq!(counts, expected);
     }
+
+    #[test]
+    fn test_count_book_with_book() {
+        let bp = "0eNrtWF2PoyAU/S8866Si+NG/MmkatWSGjIKL2p2m8b/vpe62pisK0sdJ+tAKnHO53HM59oqKqqeNZLw7FkJ8of318aRF+/erxQQ1xkrBx8ct++B5pZ7xvKZoj+h3I2nb+p3MedsI2fkFrTo0eIjxE/1G+2DwZpZ1vSyEfhEeDh6ivGMdoyPx7cflyPu6oBJQvUUkDzWihcWCK04A9PHujXjoAtDZGwGiE5O0HCdEKsInfGyLH6RW+KE1fmaFH1njx1b4xBo/scKPN59vGAD+DGKyHXE3j5h6KyJYqJJblKtZyDYwZNOoVxmCncsmzCgCl11oTjPAG0ATq+QH4QaK2I4ictmFWfaJyy7MKBzEGmqO10GtWAPpJFddnJkLqCZSvHMRjCZS7KRCXaROKsRGF3HoQqFLRuQiitAobifdzaQGDBHraA14D2vmoTOV7W0CiXEWZRlJQhJGCX5YqZ0KztTN5W1L66Ji/MOv8/KTceqHwPKrzyvYHEzoeSnqGgjXDN6qL7SweKYJjDD5m0A/TJ8zmC66PHOK+E5hafS2UKTz9fso36KvvnzGWyo7GJjBSvThBnjR2FUCquAzh9M6GTKkds5OU2z/EWRPBDPV6CHgZI1C7TumRv22ZJSX1G/y8us+fnys5ULWULGjqsYCZKdJATdSnHrYx1mB1fC9UuEN9/kwnR8ZP8P2hLyM6x+/4ITaTjGP+psdCbQjWDsSDocBPkv2dq0klDWxqWD7ezNS/cuq6jInDo1KNnjbaQdJTDpI4NalYiMOtzaVaLLj1pliDeqm1hQbFcnEytb0xPrapxUskKz0G1HRZQpdFuItuomNbHFiG+6EIXmZiZ0KJXmZi52ixi+zsVNpEKML3E1+kRGHm/yIJjtu8otWja399U0sfa39/U1+7m/d/Y1jJw3q6iFxQr3VLtj031ATKsXv0IKJB42NHLa+jgRzLzL+7U9oD+XqvOjx35uL2evNS/CGP6QVqbc=";
+        let json = crate::blueprint::blueprint_to_json(bp);
+        let counts = count(&json);
+        let expected = [
+            (("assembling-machine-3", Some("uncommon")), 2),
+            (("bulk-inserter", None), 4),
+            (("express-transport-belt", None), 33),
+            (("long-handed-inserter", None), 2),
+            (("medium-electric-pole", None), 2),
+            (("turbo-transport-belt", None), 9),
+        ]
+        .into_iter()
+        .map(|((name, quality), v)| ((name.to_owned(), Quality(quality.map(|q| q.to_owned()))), v))
+        .collect::<BTreeMap<(String, Quality), u64>>();
+        assert_eq!(counts, expected);
+    }
 }
