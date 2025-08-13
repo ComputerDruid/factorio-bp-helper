@@ -44,6 +44,17 @@ pub(crate) fn upgrade(mut json: serde_json::Value) -> serde_json::Value {
             if let Some(logistic_condition) = control_behavior.get_mut("logistic_condition") {
                 upgrade_circuit_condition(logistic_condition);
             }
+            if let Some(serde_json::Value::Object(sections)) = control_behavior.get_mut("sections")
+                && let Some(serde_json::Value::Array(sections)) = sections.get_mut("sections")
+            {
+                for section in sections {
+                    if let Some(serde_json::Value::Array(filters)) = section.get_mut("filters") {
+                        for filter in filters {
+                            upgrade_quality(filter);
+                        }
+                    }
+                }
+            }
         }
         if let Some(filter) = entity.get_mut("filter") {
             upgrade_quality(filter);
@@ -676,9 +687,7 @@ mod tests {
         }
     }
 
-    // TODO: implement constant combinators
     #[test]
-    #[should_panic = "wrong qualities"]
     fn test_constant_combinator_signals() {
         let bp = test_bp!(
             bp: "0eNqdktFqwzAMRf9Fz85YkmYlhn3JCMVJtc5gy67jlIXgf5+csY4Wuo6+yVfSvQfbC/RmQh80RZAL6MHRCPJtgVEfSJmskbIIEnInKorF4GyvSUUXIAnQtMdPkGXqBCBFHTV+G6yHeUeT7THwgPjLSIB3I+86yonsVz+3T42AGWRRlVxyEu/F4Myuxw910rzEkyMOeWm8rDn9B0vAuzYRw7V6ZvEeQ+ECMsJxUoaRWZ6I2SzD5FTrVVghJbyuwpTvqkzi7Ffd8wtqFW57dZdujzCj18O/M+rHMgwekPYqzHeCupTyf9ARLTd/f5iAE0eur9y8VO2mbZtt3dSbbZXSF0iP2Dc=",
