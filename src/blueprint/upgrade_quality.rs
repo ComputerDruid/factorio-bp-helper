@@ -17,8 +17,6 @@ fn upgrade_quality(thing: &mut serde_json::Value) {
             .find(|pair| pair[0] == s)
             .unwrap_or_else(|| panic!("can't find quality {s}"))[1];
         *quality = json!(new_quality);
-    } else {
-        // TODO handle normal
     }
 }
 
@@ -68,8 +66,6 @@ pub(crate) fn upgrade(mut json: serde_json::Value) -> serde_json::Value {
             let s = quality.as_str().unwrap();
             let new_quality = QUALITIES.windows(2).find(|pair| pair[0] == s).unwrap()[1];
             *quality = json!(new_quality);
-        } else {
-            // TODO figure out what things are supposed to have a recipe quality when the recipe is normal
         }
         if let Some(request_filters) = entity.get_mut("request_filters") {
             if let Some(sections) = request_filters.get_mut("sections") {
