@@ -26,7 +26,9 @@ fn upgrade_circuit_condition(circuit_condition: &mut serde_json::Value) {
     if let Some(first_signal) = circuit_condition.get_mut("first_signal") {
         upgrade_quality(first_signal);
     }
-    // TODO what about second signal?
+    if let Some(second_signal) = circuit_condition.get_mut("second_signal") {
+        upgrade_quality(second_signal);
+    }
 }
 
 pub(crate) fn upgrade(mut json: serde_json::Value) -> serde_json::Value {
@@ -279,8 +281,7 @@ mod tests {
               },
               "second_signal": {
                 "name": "plastic-bar",
-                // TODO upgrade second signal
-                "quality": "rare"
+                "quality": "epic"
               }
             })
         );
@@ -342,8 +343,7 @@ mod tests {
               },
               "second_signal": {
                 "name": "low-density-structure",
-                // TODO upgrade second signal
-                "quality": "rare"
+                "quality": "epic"
               }
             })
         );
