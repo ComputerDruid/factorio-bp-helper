@@ -1,4 +1,6 @@
 pub(crate) mod count_entities;
+pub(crate) mod upgrade_quality;
+
 use std::{
     fmt::{Debug, Display},
     io::Read,
