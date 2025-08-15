@@ -1,5 +1,7 @@
 ## Unreleased
 
+## Version 0.1.4
+
 ### Added
 - New command `upgrade-quality` for upgrading a blueprint to a higher quality when parameterized blueprints don't work.
 
