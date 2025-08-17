@@ -1,4 +1,5 @@
 mod blueprint;
+mod json_walk;
 
 use std::{
     fmt::Write as _,

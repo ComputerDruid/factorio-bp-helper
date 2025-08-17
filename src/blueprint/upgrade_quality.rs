@@ -1,4 +1,4 @@
-use serde_json::json;
+use crate::json_walk::{WalkAction, walk_json};
 
 const QUALITIES: [&str; 6] = [
     "normal",
@@ -9,82 +9,106 @@ const QUALITIES: [&str; 6] = [
     "legendary",
 ];
 
-fn upgrade_quality(thing: &mut serde_json::Value) {
-    if let Some(quality) = thing.get_mut("quality") {
-        let s = quality.as_str().unwrap();
-        let new_quality = QUALITIES
-            .windows(2)
-            .find(|pair| pair[0] == s)
-            .unwrap_or_else(|| panic!("can't find quality {s}"))[1];
-        *quality = json!(new_quality);
-    }
+fn upgrade_quality(quality: &mut String) {
+    let new_quality = QUALITIES
+        .windows(2)
+        .find(|pair| pair[0] == quality)
+        .unwrap_or_else(|| panic!("can't find quality {quality}"))[1];
+    *quality = new_quality.to_owned();
 }
 
-fn upgrade_circuit_condition(circuit_condition: &mut serde_json::Value) {
-    if let Some(first_signal) = circuit_condition.get_mut("first_signal") {
-        upgrade_quality(first_signal);
-    }
-    if let Some(second_signal) = circuit_condition.get_mut("second_signal") {
-        upgrade_quality(second_signal);
-    }
-}
+#[rustfmt::skip]
+const UPGRADE_PATHS: &[&[&str]] = &[
+    &["blueprint", "entities", "[]", "filter", "quality"],
+    &["blueprint", "entities", "[]", "filters", "[]", "quality"],
+    &["blueprint", "entities", "[]", "recipe_quality"],
+    &["blueprint", "entities", "[]", "control_behavior", "circuit_condition", "first_signal", "quality"],
+    &["blueprint", "entities", "[]", "control_behavior", "circuit_condition", "second_signal", "quality"],
+    &["blueprint", "entities", "[]", "control_behavior", "logistic_condition", "first_signal", "quality"],
+    &["blueprint", "entities", "[]", "control_behavior", "logistic_condition", "second_signal", "quality"],
+    // requester chest with sections
+    &["blueprint", "entities", "[]", "request_filters", "sections", "[]", "filters", "[]", "quality"],
+    // constant combinator with sections
+    &["blueprint", "entities", "[]", "control_behavior", "sections", "sections", "[]", "filters", "[]", "quality"],
+    // decider combinator
+    &["blueprint", "entities", "[]", "control_behavior", "decider_conditions", "conditions", "[]", "first_signal", "quality"],
+    &["blueprint", "entities", "[]", "control_behavior", "decider_conditions", "conditions", "[]", "second_signal", "quality"],
+    &["blueprint", "entities", "[]", "control_behavior", "decider_conditions", "outputs", "[]", "signal", "quality"],
+    // arithmetic combinator
+    &["blueprint", "entities", "[]", "control_behavior", "arithmetic_conditions", "first_signal", "quality"],
+    &["blueprint", "entities", "[]", "control_behavior", "arithmetic_conditions", "second_signal", "quality"],
+    &["blueprint", "entities", "[]", "control_behavior", "arithmetic_conditions", "output_signal", "quality"],
+
+    // selector combinator index signal
+    &["blueprint", "entities", "[]", "control_behavior", "index_signal", "quality"],
+    // selector combinator count signal
+    &["blueprint", "entities", "[]", "control_behavior", "count_signal", "quality"],
+    // selector combinator quality transfer static quality
+    &["blueprint", "entities", "[]", "control_behavior", "quality_source_static", "name"],
+    // selector combinator quality filter
+    &["blueprint", "entities", "[]", "control_behavior", "quality_filter", "quality"],
+    // selector combinator quality filter destination signal
+    &["blueprint", "entities", "[]", "control_behavior", "quality_destination_signal", "quality"],
+
+
+];
+
+#[rustfmt::skip]
+const IGNORE_PATHS: &[&[&str]] = &[
+    // static quality is under quality_source_static.name, listed above
+    &["blueprint", "entities", "[]", "control_behavior", "quality_source_static"],
+    // quality filter quality is under quality_filter.quality
+    &["blueprint", "entities", "[]", "control_behavior", "quality_filter"],
+    // quality transfer destination signal (quality under quality_destination_signal.quality)
+    &["blueprint", "entities", "[]", "control_behavior", "quality_destination_signal"],
+    // quality transfer source signal (never has a quality because it picks the quality from the biggest)
+    &["blueprint", "entities", "[]", "control_behavior", "quality_source_signal"],
+];
+
+#[rustfmt::skip]
+const NO_UPGRADE_PATHS: &[&[&str]] = &[
+    // Don't upgrade modules
+    &["blueprint", "entities", "[]", "items", "[]", "id", "quality"],
+    // Don't upgrade entities
+    &["blueprint", "entities", "[]", "quality"],
+    // Usually icons match entities not recipes, although there's really no way to know
+    &["blueprint", "icons", "[]", "signal", "quality"],
+    // Just a boolean picking between quality_source_signal and quality_source_static
+    &["blueprint", "entities", "[]", "control_behavior", "select_quality_from_signal"],
+];
 
 pub(crate) fn upgrade(mut json: serde_json::Value) -> serde_json::Value {
-    let bp = json
-        .get_mut("blueprint")
-        .expect("blueprint books not supported yet");
-    let entities = bp.get_mut("entities").unwrap().as_array_mut().unwrap();
-    for entity in entities {
-        if let Some(control_behavior) = entity.get_mut("control_behavior") {
-            if let Some(circuit_condition) = control_behavior.get_mut("circuit_condition") {
-                upgrade_circuit_condition(circuit_condition);
-            }
-            if let Some(logistic_condition) = control_behavior.get_mut("logistic_condition") {
-                upgrade_circuit_condition(logistic_condition);
-            }
-            if let Some(serde_json::Value::Object(sections)) = control_behavior.get_mut("sections")
-                && let Some(serde_json::Value::Array(sections)) = sections.get_mut("sections")
+    walk_json(&mut json, &mut |path, value| {
+        if UPGRADE_PATHS.contains(&path) {
+            let serde_json::Value::String(s) = value else {
+                panic!("can't upgrade quality at {path:?}, expected string, got {value}");
+            };
+            upgrade_quality(s);
+            WalkAction::Enter
+        } else if IGNORE_PATHS.contains(&path) {
+            WalkAction::Enter
+        } else if NO_UPGRADE_PATHS.contains(&path) {
+            WalkAction::Break
+        } else {
+            if let Some(last) = path.last()
+                && last.contains("quality")
             {
-                for section in sections {
-                    if let Some(serde_json::Value::Array(filters)) = section.get_mut("filters") {
-                        for filter in filters {
-                            upgrade_quality(filter);
-                        }
-                    }
-                }
+                panic!(
+                    "Unhandled quality in blueprint; not sure whether we should upgrade:\n &{path:?},"
+                );
+            } else {
+                WalkAction::Enter
             }
         }
-        if let Some(filter) = entity.get_mut("filter") {
-            upgrade_quality(filter);
-        }
-        if let Some(filters) = entity.get_mut("filters") {
-            for filter in filters.as_array_mut().unwrap() {
-                upgrade_quality(filter);
-            }
-        }
-        if let Some(quality) = entity.get_mut("recipe_quality") {
-            let s = quality.as_str().unwrap();
-            let new_quality = QUALITIES.windows(2).find(|pair| pair[0] == s).unwrap()[1];
-            *quality = json!(new_quality);
-        }
-        if let Some(request_filters) = entity.get_mut("request_filters") {
-            if let Some(sections) = request_filters.get_mut("sections") {
-                for section in sections.as_array_mut().unwrap() {
-                    if let Some(filters) = section.get_mut("filters") {
-                        for filter in filters.as_array_mut().unwrap() {
-                            upgrade_quality(filter);
-                        }
-                    }
-                }
-            }
-        }
-    }
+    });
+    // upgrade_old(json)
     json
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
     use std::str::FromStr;
 
     macro_rules! test_bp {
@@ -774,9 +798,7 @@ mod tests {
         )
     }
 
-    // TODO: implement arithmetic combinators
     #[test]
-    #[should_panic = "wrong signals"]
     fn test_arithmetic_combinator() {
         let bp = test_bp!(
             bp: "0eNqNkc1ugzAQhN9lrzVVwk8jeJWqQsZsm5XwT9d21Aj53bvAIYdKVXxjduebMV5hWjIGJpdgWIGMdxGG9xUifTm9bJrTFmEAzZSuFhOZyng7kdPJMxQF5Gb8geFcPhSgS5QID8T+cR9dthOyLKj/UQqCj+L2bksVYnM+KbjDUNX16bWTpJkYzbHQKpCqif0yTnjVNxKAuB7kUcbzTovb4JM4pvHPpYwPAbnyjBL/nfUihUXOTnpZyZHQiBvpaStrEcTmZaiPrvAiGz6nkJ9vgIEMFDnyUymhFenxUApuyHFnd2913/Z9d2m6pr3UpfwCsbKgAQ==",
@@ -850,8 +872,6 @@ mod tests {
     }
 
     #[test]
-    // TODO: implement for decider combinators
-    #[should_panic = "wrong qualities"]
     fn test_decider_combinator() {
         let bp = test_bp!(
             bp: "0eNqdkutOwzAMhd/FvzPELmVqXwVNUdp6YKl1Qi4T1ZR3x2kngQSMjZ859Tn+juoztENC54kjNGegznKA5vkMgV7YDEVjMyI00GNHPfpVZ8eW2ETrISsg7vEdmnU+KECOFAkX//yYNKexRS8D6kqOAmeDWC2XfRK3XT8qmKBZbdb1QyVrevLYLQM7BQIZvR10i6/mRBIgrkuslm/9HBWK+vUlUEfyIepv1TrrnBBZj4Lylswg5CInFsZRdgpAwBJ1s9UbEXJW965cfHevQ0ddsQmvkwQdJ1emDfdwhYG85X+V/tF4qSx3YFN0Kf5yRn82cJP8w8RRH70dNbFEQXM0Q8BS5TaWJS0f8sxDEUcRPw9dwQl9mK+petrUu7qu9ttqu9tvcv4Afs8QFg==",
@@ -1061,8 +1081,55 @@ mod tests {
             })
         );
         let upgraded = upgrade(bp);
-        // TODO implement and add assertions
-        drop(upgraded)
+        let select_combinator = jaq_one(
+            r#".blueprint.entities[] | select(.control_behavior.operation == "select")"#,
+            upgraded.clone(),
+        );
+        assert_eq!(
+            jaq_one(".control_behavior.index_signal.quality", select_combinator),
+            json!("legendary"),
+        );
+        let count_combinator = jaq_one(
+            r#".blueprint.entities[] | select(.control_behavior.operation == "count")"#,
+            upgraded.clone(),
+        );
+        assert_eq!(
+            jaq_one(".control_behavior.count_signal.quality", count_combinator),
+            json!("epic"),
+        );
+        let static_quality_transfer_combinator = jaq_one(
+            r#".blueprint.entities[] | select(.control_behavior.operation == "quality-transfer" and .control_behavior.quality_source_static)"#,
+            upgraded.clone(),
+        );
+        assert_eq!(
+            jaq_one(
+                ".control_behavior.quality_source_static.name",
+                static_quality_transfer_combinator
+            ),
+            json!("epic"),
+        );
+        let quality_from_signal_transfer_combinator = jaq_one(
+            r#".blueprint.entities[] | select(.control_behavior.operation == "quality-transfer" and .control_behavior.select_quality_from_signal == true)"#,
+            upgraded.clone(),
+        );
+        assert_eq!(
+            jaq_one(
+                ".control_behavior.quality_destination_signal.quality",
+                quality_from_signal_transfer_combinator
+            ),
+            json!("legendary"),
+        );
+        let quality_filter_combinator = jaq_one(
+            r#".blueprint.entities[] | select(.control_behavior.operation == "quality-filter")"#,
+            upgraded.clone(),
+        );
+        assert_eq!(
+            jaq_one(
+                ".control_behavior.quality_filter.quality",
+                quality_filter_combinator
+            ),
+            json!("epic"),
+        );
     }
 
     // #[test]
