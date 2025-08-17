@@ -1,5 +1,8 @@
 ## Unreleased
 
+### Added
+- New subcommand: `save`, which saves blueprints as a .json file, or as a directory of json files for blueprint books
+
 ### Changed
 - `upgrade-quality` works on combinators
 - `upgrade-quality` now errors when encountering something that looks like a quality that it doesn't know if it should upgrade.

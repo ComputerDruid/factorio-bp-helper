@@ -10,6 +10,7 @@ Commands:
   unwrap           Unwraps a blueprint string to reveal the json representation
   wrap             Wraps json from stdin into a blueprint string
   upgrade-quality  Upgrades the quality of recipies/filters/conditions without upgrading entities/modules
+  save             Saves blueprint as a .json file, or as a directory of json files if it's a blueprint book
   help             Print this message or the help of the given subcommand(s)
 
 Options:
