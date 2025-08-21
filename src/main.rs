@@ -1,10 +1,10 @@
 mod blueprint;
 mod json_walk;
+mod save;
 
-use std::{
-    fmt::Write as _,
-    io::{Read, stderr, stdin},
-};
+use std::fmt::Write;
+use std::io::{Read, stderr, stdin};
+use std::str::FromStr;
 
 use blueprint::{blueprint_to_json, json_to_blueprint};
 use clap::{Parser, Subcommand};
@@ -43,6 +43,8 @@ enum Commands {
         to_clipboard: bool,
         blueprint_string: Option<String>,
     },
+    /// Saves blueprint as a .json file, or as a directory of json files if it's a blueprint book.
+    Save { blueprint_string: Option<String> },
 }
 
 mod terminal;
@@ -130,6 +132,13 @@ impl Commands {
                 } else {
                     println!("{bp}");
                 }
+            }
+            Commands::Save { blueprint_string } => {
+                let blueprint_string = blueprint_string.unwrap_or_else(terminal::prompt_blueprint);
+                let json = blueprint_to_json(&blueprint_string);
+                let json = serde_json::Value::from_str(&json).expect("should contain valid json");
+
+                save::save(json, None);
             }
         }
     }
