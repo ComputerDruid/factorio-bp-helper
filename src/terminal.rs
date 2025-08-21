@@ -1,8 +1,15 @@
-use std::io::stderr;
+use std::io::{IsTerminal, Read, stderr, stdin};
 
 use crossterm::event::{DisableBracketedPaste, EnableBracketedPaste, KeyCode, KeyModifiers};
 
 pub fn prompt_blueprint() -> String {
+    if !stdin().is_terminal() {
+        let mut buf = String::new();
+        stdin()
+            .read_to_string(&mut buf)
+            .expect("error reading from stdin");
+        return buf;
+    }
     crossterm::execute!(stderr(), EnableBracketedPaste).unwrap();
     crossterm::terminal::enable_raw_mode().unwrap();
     eprint!("Paste blueprint:\r\n");

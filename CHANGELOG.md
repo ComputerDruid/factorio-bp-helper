@@ -3,6 +3,7 @@
 ### Changed
 - `upgrade-quality` works on combinators
 - `upgrade-quality` now errors when encountering something that looks like a quality that it doesn't know if it should upgrade.
+- `🟦❯` prompt mode now only enabled if stdin is a terminal. If it's not, instead we just read from stdin until EOF.
 
 ## Version 0.1.4
 
