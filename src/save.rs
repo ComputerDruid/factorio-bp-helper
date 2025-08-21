@@ -6,7 +6,11 @@ use std::{
 };
 
 pub fn save(mut json: serde_json::Value, dir: Option<&Path>) {
-    let mut name = if let Some(thing) = json.get("blueprint").or(json.get("blueprint_book"))
+    let mut name = if let Some(thing) = json
+        .get("blueprint")
+        .or(json.get("blueprint_book"))
+        .or(json.get("upgrade_planner"))
+        .or(json.get("deconstruction_planner"))
         && let Some(name) = thing.get("label")
         && let Some(name) = name.as_str()
     {
@@ -27,6 +31,46 @@ pub fn save(mut json: serde_json::Value, dir: Option<&Path>) {
                 name.push_str(signal_name);
             }
         }
+        if !name.is_empty() {
+            name
+        } else {
+            "Untitled".to_owned()
+        }
+    } else if let Some(blueprint) = json.get("deconstruction_planner")
+        && let Some(settings) = blueprint.get("settings")
+    {
+        let mut name = String::new();
+
+        let entities = settings.get("entity_filters");
+        let entities = entities
+            .iter()
+            .flat_map(|e| e.as_array())
+            .flatten()
+            .flat_map(|e| e.get("name"))
+            .flat_map(|e| e.as_str())
+            .map(|entity_name| format!("[entity={entity_name}]"));
+
+        let tiles = settings.get("tile_filters");
+        let tiles = tiles
+            .iter()
+            .flat_map(|e| e.as_array())
+            .flatten()
+            .flat_map(|e| e.get("name"))
+            .flat_map(|e| e.as_str())
+            .map(|tile_name| format!("[tile={tile_name}]"));
+
+        let mut iter = entities.chain(tiles).fuse();
+
+        for name_part in (&mut iter).take(4) {
+            if !name.is_empty() {
+                name.push(' ');
+            }
+            name.push_str(&name_part);
+        }
+        if iter.next().is_some() {
+            name.push_str(" …");
+        }
+
         if !name.is_empty() {
             name
         } else {
@@ -135,5 +179,23 @@ mod tests {
         assert_eq!(subsubfiles, ["6 bulk-inserter.json", "book.json"]);
 
         // TODO: when load is implemented, test that it can load everything back properly.
+    }
+
+    #[test]
+    fn test_save_deconstruction_planner() {
+        let bp = "0eNptj90KwjAMhd8l1xvofhwr+CQio65Rim0620yU0Xc3ol4MvEu+E87JWcDgGChxnEe2gYbJaSKMoBZIyGzpkt4zElt+DmfrGKOQwwKkPYKC0+yupaWEURQo4DZrJ6eiUIheO0Fj8JOOmoPYwl6AJYMPUJt8LICtwyGhw0++D0Zct1/+J0/+M4LdyibLwuhFXtcpf3UKuIuPEFDtruqbvm+7uq2brsr5Baj6WmY=";
+        let dir = tempfile::tempdir().unwrap();
+        let json = crate::blueprint::blueprint_to_json(bp);
+        let json = serde_json::Value::from_str(&json).expect("should contain valid json");
+        save(json.clone(), Some(dir.path()));
+        let files = read_dir_unwrap(dir.path());
+        assert_eq!(files, &["[entity=bulk-inserter] [tile=landfill].json"]);
+        let written_json = std::fs::read_to_string(
+            dir.path()
+                .join("[entity=bulk-inserter] [tile=landfill].json"),
+        )
+        .unwrap();
+        let written_json = serde_json::Value::from_str(&written_json).unwrap();
+        assert_eq!(written_json, json);
     }
 }
