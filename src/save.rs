@@ -6,20 +6,20 @@ use std::{
 };
 
 pub fn save(mut json: serde_json::Value, dir: Option<&Path>) {
-    let mut name = if let Some(thing) = json
+    let mut name = String::new();
+    if let Some(thing) = json
         .get("blueprint")
         .or(json.get("blueprint_book"))
         .or(json.get("upgrade_planner"))
         .or(json.get("deconstruction_planner"))
-        && let Some(name) = thing.get("label")
-        && let Some(name) = name.as_str()
+        && let Some(label) = thing.get("label")
+        && let Some(label) = label.as_str()
     {
-        name.to_owned()
+        name = label.to_owned();
     } else if let Some(blueprint) = json.get("blueprint")
         && let Some(icons) = blueprint.get("icons")
         && let Some(icons) = icons.as_array()
     {
-        let mut name = String::new();
         for icon in icons {
             if let Some(signal) = icon.get("signal")
                 && let Some(signal_name) = signal.get("name")
@@ -31,16 +31,9 @@ pub fn save(mut json: serde_json::Value, dir: Option<&Path>) {
                 name.push_str(signal_name);
             }
         }
-        if !name.is_empty() {
-            name
-        } else {
-            "Untitled".to_owned()
-        }
     } else if let Some(blueprint) = json.get("deconstruction_planner")
         && let Some(settings) = blueprint.get("settings")
     {
-        let mut name = String::new();
-
         let entities = settings.get("entity_filters");
         let entities = entities
             .iter()
@@ -70,14 +63,37 @@ pub fn save(mut json: serde_json::Value, dir: Option<&Path>) {
         if iter.next().is_some() {
             name.push_str(" …");
         }
-
-        if !name.is_empty() {
-            name
-        } else {
-            "Untitled".to_owned()
+    } else if let Some(blueprint) = json.get("upgrade_planner")
+        && let Some(settings) = blueprint.get("settings")
+        && let Some(mappers) = settings.get("mappers")
+        && let Some(mappers) = mappers.as_array()
+    {
+        let mut iter = mappers.iter().fuse();
+        for mapper in (&mut iter).take(4) {
+            if let Some(to) = mapper.get("to")
+                && let Some(name_part) = to.get("name")
+                && let Some(name_part) = name_part.as_str()
+            {
+                if !name.is_empty() {
+                    name.push(' ');
+                }
+                if let Some(typ) = to.get("type")
+                    && let Some(typ) = typ.as_str()
+                    && typ == "entity"
+                {
+                    name.push_str(&format!("[entity={name_part}]"));
+                } else {
+                    name.push_str(&name_part);
+                }
+            }
         }
-    } else {
-        "Untitled".to_owned()
+        if !name.is_empty() {
+            name = format!("Upgrade {name}");
+        }
+    }
+
+    if name.is_empty() {
+        name = "Untitled".to_owned()
     };
 
     if let Some(index) = json.get_mut("index")
@@ -195,6 +211,21 @@ mod tests {
                 .join("[entity=bulk-inserter] [tile=landfill].json"),
         )
         .unwrap();
+        let written_json = serde_json::Value::from_str(&written_json).unwrap();
+        assert_eq!(written_json, json);
+    }
+
+    #[test]
+    fn test_save_upgrade_planner() {
+        let bp = "0eNqtkdFqwzAMRf9FzwmUNmkbQ7+klKGuagjEsisroyX43ycz1sIGWx/6ZOkiXx10Z5hiL3iitzgiMwm4GRKpDtynUnuMkcTK/QxnCb5oeosEDoh10BtUwOhLr4KcYhCtjzSq6ZcJxzLhgIN4HE16Dz6ioAZbBDvIFWj4w/KMSesfvvZn4BNdwS1y9S/UZKPSS7D3xVi/nB9gzRNgKRqE2sFfBnR3fIBs86E0Sr6c4ivp+jvpCj4s2SEwuHa97JquazerdtVsljl/Ag1ntSg=";
+        let dir = tempfile::tempdir().unwrap();
+        let json = crate::blueprint::blueprint_to_json(bp);
+        let json = serde_json::Value::from_str(&json).expect("should contain valid json");
+        save(json.clone(), Some(dir.path()));
+        let files = read_dir_unwrap(dir.path());
+        const EXPECTED_NAME: &str = "Upgrade [entity=fast-transport-belt] [entity=fast-underground-belt] [entity=fast-splitter].json";
+        assert_eq!(files, [EXPECTED_NAME]);
+        let written_json = std::fs::read_to_string(dir.path().join(EXPECTED_NAME)).unwrap();
         let written_json = serde_json::Value::from_str(&written_json).unwrap();
         assert_eq!(written_json, json);
     }
