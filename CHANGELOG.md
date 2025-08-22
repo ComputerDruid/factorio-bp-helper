@@ -1,5 +1,7 @@
 ## Unreleased
 
+## Version 0.1.5
+
 ### Added
 - New subcommand: `save`, which saves blueprints as a .json file, or as a directory of json files for blueprint books
 

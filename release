@@ -1,0 +1,6 @@
+#!/bin/bash
+set -euE -o pipefail
+
+cargo release version patch --execute --no-confirm --allow-branch=HEAD
+new_version="$(cargo metadata --format-version=1 --no-deps | jq -r '.packages[] | select(.name == "factorio-bp-helper") | .version')"
+sed -i "s/^## Unreleased$/## Unreleased\n\n## Version $new_version/" CHANGELOG.md
