@@ -14,7 +14,7 @@ pub fn prompt_blueprint() -> String {
     crossterm::terminal::enable_raw_mode().unwrap();
     eprint!("Paste blueprint:\r\n");
     const PROMPT: &str = "🟦❯ ";
-    eprint!("{}", PROMPT);
+    eprint!("{PROMPT}");
     let mut warned = false;
     let blueprint_string = loop {
         let event = crossterm::event::read().unwrap();
@@ -29,7 +29,7 @@ pub fn prompt_blueprint() -> String {
                 if !warned {
                     warned = true;
                     eprint!("\rWARN: Only pasting works.\r\n");
-                    eprint!("{}", PROMPT);
+                    eprint!("{PROMPT}");
                 }
             }
             crossterm::event::Event::Paste(s) => {

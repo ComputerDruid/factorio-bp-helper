@@ -99,7 +99,7 @@ fn compute_name(json: &serde_json::Value) -> String {
                 name.push_str(&name_part);
             }
             if iter.next().is_some() {
-                name.push_str("…");
+                name.push('…');
             }
         } else if let Some(blueprint) = json.get("upgrade_planner")
             && let Some(settings) = blueprint.get("settings")
@@ -135,7 +135,7 @@ fn compute_name(json: &serde_json::Value) -> String {
                 name.push_str(&name_part);
             }
             if iter.next().is_some() {
-                name.push_str("…");
+                name.push('…');
             }
             if !name.is_empty() {
                 name = format!("Upgrade {name}");
@@ -172,7 +172,7 @@ pub fn save(mut json: serde_json::Value, dir: Option<&Path>) {
         && let Some(blueprints) = blueprint_book.get_mut("blueprints")
         && let Some(blueprints) = blueprints.as_array_mut()
     {
-        let blueprints = mem::replace(blueprints, vec![]);
+        let blueprints = mem::take(blueprints);
         let path = if let Some(dir) = dir {
             dir.join(&name)
         } else {

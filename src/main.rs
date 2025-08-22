@@ -50,7 +50,7 @@ enum Commands {
 mod terminal;
 
 impl Commands {
-    fn run(self) -> () {
+    fn run(self) {
         match self {
             Commands::CountEntities {
                 to_blueprint,
@@ -105,13 +105,13 @@ impl Commands {
             Commands::Unwrap { blueprint_string } => {
                 let blueprint_string = blueprint_string.unwrap_or_else(terminal::prompt_blueprint);
                 let json = blueprint_to_json(&blueprint_string);
-                println!("{}", json);
+                println!("{json}");
             }
             Commands::Wrap {} => {
                 let mut buf = String::new();
                 stdin().read_to_string(&mut buf).unwrap();
                 let blueprint_string = json_to_blueprint(serde_json::from_str(&buf).unwrap());
-                println!("{}", blueprint_string);
+                println!("{blueprint_string}");
             }
             Commands::UpgradeQuality {
                 to_clipboard,

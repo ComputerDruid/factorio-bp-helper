@@ -89,16 +89,14 @@ pub(crate) fn upgrade(mut json: serde_json::Value) -> serde_json::Value {
             WalkAction::Enter
         } else if NO_UPGRADE_PATHS.contains(&path) {
             WalkAction::Break
+        } else if let Some(last) = path.last()
+            && last.contains("quality")
+        {
+            panic!(
+                "Unhandled quality in blueprint; not sure whether we should upgrade:\n &{path:?},"
+            );
         } else {
-            if let Some(last) = path.last()
-                && last.contains("quality")
-            {
-                panic!(
-                    "Unhandled quality in blueprint; not sure whether we should upgrade:\n &{path:?},"
-                );
-            } else {
-                WalkAction::Enter
-            }
+            WalkAction::Enter
         }
     });
     // upgrade_old(json)
