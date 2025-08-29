@@ -1,9 +1,13 @@
 mod blueprint;
 mod json_walk;
+mod load;
 mod save;
+#[cfg(test)]
+mod test_util;
 
 use std::fmt::Write;
 use std::io::{Read, stderr, stdin};
+use std::path::PathBuf;
 use std::str::FromStr;
 
 use blueprint::{blueprint_to_json, json_to_blueprint};
@@ -45,6 +49,16 @@ enum Commands {
     },
     /// Saves blueprint as a .json file, or as a directory of json files if it's a blueprint book.
     Save { blueprint_string: Option<String> },
+    /// Loads previously-saved blueprints from the given file or directory.
+    Load {
+        file: PathBuf,
+        /// Sends the output to the clipboard
+        #[arg(long)]
+        to_clipboard: bool,
+        /// Add the current git commit to the description as a tag.
+        #[arg(long)]
+        stamp: bool,
+    },
 }
 
 mod terminal;
@@ -139,6 +153,23 @@ impl Commands {
                 let json = serde_json::Value::from_str(&json).expect("should contain valid json");
 
                 save::save(json, None);
+            }
+            Commands::Load {
+                file,
+                to_clipboard,
+                stamp,
+            } => {
+                let json = load::load(&file);
+                if stamp {
+                    unimplemented!();
+                }
+                let bp = json_to_blueprint(json);
+                if to_clipboard {
+                    crossterm::execute!(stderr(), CopyToClipboard::to_clipboard_from(bp)).unwrap();
+                    println!("blueprint copied to clipboard.")
+                } else {
+                    println!("{bp}");
+                }
             }
         }
     }
