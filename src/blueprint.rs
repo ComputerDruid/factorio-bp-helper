@@ -2,8 +2,10 @@ pub(crate) mod count_entities;
 pub(crate) mod upgrade_quality;
 
 use std::{
+    borrow::Borrow,
     fmt::{Debug, Display},
     io::Read,
+    mem,
 };
 
 use base64::{Engine, prelude::BASE64_STANDARD};
@@ -41,6 +43,80 @@ pub fn json_to_blueprint(value: serde_json::Value) -> String {
     };
     BASE64_STANDARD.encode_string(&compressed, &mut result);
     result
+}
+
+pub(crate) enum BlueprintType<T: Borrow<serde_json::Value>> {
+    Blueprint(T),
+    BlueprintBook(T),
+    UpgradePlanner(T),
+    DeconstructionPlanner(T),
+}
+
+impl BlueprintType<&mut serde_json::Value> {
+    pub fn new(json: &mut serde_json::Value) -> BlueprintType<&mut serde_json::Value> {
+        let json = match json {
+            serde_json::Value::Object(json) => json,
+            _ => panic!("blueprint entry should be an object, got {json:?}"),
+        };
+
+        if json.contains_key("blueprint") {
+            BlueprintType::Blueprint(&mut json["blueprint"])
+        } else if json.contains_key("blueprint_book") {
+            BlueprintType::BlueprintBook(&mut json["blueprint_book"])
+        } else if json.contains_key("upgrade_planner") {
+            BlueprintType::UpgradePlanner(&mut json["upgrade_planner"])
+        } else if json.contains_key("deconstruction_planner") {
+            BlueprintType::DeconstructionPlanner(&mut json["deconstruction_planner"])
+        } else {
+            panic!("blueprint has unknown type: {:?}", json.keys());
+        }
+    }
+
+    fn any_mut(&mut self) -> &mut serde_json::Value {
+        match self {
+            BlueprintType::Blueprint(value) => value,
+            BlueprintType::BlueprintBook(value) => value,
+            BlueprintType::UpgradePlanner(value) => value,
+            BlueprintType::DeconstructionPlanner(value) => value,
+        }
+    }
+
+    pub(crate) fn set_tag_in_description(&mut self, tag: &str, value: &str) {
+        let description = self
+            .any_mut()
+            .as_object_mut()
+            .expect("should be a json object")
+            .entry("description")
+            .or_insert_with(|| json!(""));
+        let serde_json::Value::String(description) = description else {
+            panic!("expected description to be a string")
+        };
+        *description = set_tag_in_string(mem::take(description), tag, value);
+    }
+}
+
+fn set_tag_in_string(description: String, tag: &str, value: &str) -> String {
+    let start_offset = if description.starts_with(&format!("{tag}:")) {
+        0
+    } else if let Some(index) = description.find(&format!("\n{tag}:")) {
+        index + "\n".len()
+    } else {
+        // couldn't find tag, add it to a new line at the end
+        let mut new_description = description;
+        if !new_description.is_empty() {
+            new_description.push('\n');
+        }
+        new_description.push_str(&format!("{tag}: {value}"));
+        return new_description;
+    };
+    let old_description = description;
+    let prefix = &old_description[..start_offset];
+    let suffix = if let Some(end_index) = &old_description[start_offset..].find("\n") {
+        &old_description[start_offset + end_index..]
+    } else {
+        ""
+    };
+    format!("{prefix}{tag}: {value}{suffix}")
 }
 
 pub fn make_constant_combinator_json(signals: Vec<((String, Quality), i64)>) -> serde_json::Value {
@@ -117,5 +193,24 @@ impl Quality {
                 Ok(())
             }
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::blueprint::set_tag_in_string;
+
+    #[test]
+    fn test_set_tag() {
+        assert_eq!(
+            set_tag_in_string("foo bar".into(), "t", "val"),
+            "foo bar\nt: val"
+        );
+
+        // Empty string considered to be empty
+        assert_eq!(set_tag_in_string("".into(), "t", "val"), "t: val");
+
+        // Existing newlines are considered intentional
+        assert_eq!(set_tag_in_string("\n".into(), "t", "val"), "\n\nt: val");
     }
 }

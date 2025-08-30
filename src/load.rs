@@ -2,6 +2,8 @@ use std::{fs, path::Path};
 
 use itertools::Itertools;
 
+use crate::blueprint;
+
 fn load_file(path: &Path) -> serde_json::Value {
     serde_json::from_str(
         &fs::read_to_string(path)
@@ -92,6 +94,21 @@ pub fn load(path: &Path) -> serde_json::Value {
         .map(|(_path, _index, json)| json)
         .collect();
     book_json
+}
+
+pub(crate) fn stamp(json: &mut serde_json::Value, path: &Path) {
+    let dir = if path.is_dir() {
+        path
+    } else {
+        path.parent().unwrap_or(Path::new("."))
+    };
+    let repo =
+        gix::discover(dir).unwrap_or_else(|e| panic!("error: couldn't find git repository: {e}"));
+    let id = repo
+        .head_id()
+        .unwrap_or_else(|e| panic!("error: couldn't get HEAD commit: {e}"));
+    let mut bp = blueprint::BlueprintType::new(json);
+    bp.set_tag_in_description("last_commit", &format!("{id}"));
 }
 
 #[cfg(test)]

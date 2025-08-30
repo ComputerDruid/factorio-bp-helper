@@ -159,9 +159,9 @@ impl Commands {
                 to_clipboard,
                 stamp,
             } => {
-                let json = load::load(&file);
+                let mut json = load::load(&file);
                 if stamp {
-                    unimplemented!();
+                    load::stamp(&mut json, &file);
                 }
                 let bp = json_to_blueprint(json);
                 if to_clipboard {
