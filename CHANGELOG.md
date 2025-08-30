@@ -1,5 +1,8 @@
 ## Unreleased
 
+### Added
+- New subcommand: `load`, which loads blueprint books saved with `save`
+
 ## Version 0.1.5
 
 ### Added

@@ -205,20 +205,9 @@ pub fn save(mut json: serde_json::Value, dir: Option<&Path>) {
 
 #[cfg(test)]
 mod tests {
-    use std::{ffi::OsString, fs::read_dir, str::FromStr as _};
+    use std::str::FromStr as _;
 
-    #[track_caller]
-    fn read_dir_unwrap(path: &Path) -> Vec<OsString> {
-        let mut result = read_dir(path)
-            .unwrap_or_else(|e| panic!("error reading directory {path:?}: {e}"))
-            .map(|f| {
-                f.unwrap_or_else(|e| panic!("error while reading directory {path:?}: {e}"))
-                    .file_name()
-            })
-            .collect::<Vec<_>>();
-        result.sort();
-        result
-    }
+    use crate::test_util::read_dir_unwrap;
 
     use super::*;
     #[test]
@@ -234,6 +223,9 @@ mod tests {
             std::fs::read_to_string(dir.path().join("[icon=selector-combinator].json")).unwrap();
         let written_json = serde_json::Value::from_str(&written_json).unwrap();
         assert_eq!(written_json, json);
+
+        let loaded_json = crate::load::load(&dir.path().join("[icon=selector-combinator].json"));
+        assert_eq!(loaded_json, json)
     }
 
     #[test]
@@ -250,7 +242,8 @@ mod tests {
         let subsubfiles = read_dir_unwrap(&dir.path().join("Untitled/1 Nested Book"));
         assert_eq!(subsubfiles, ["6 [icon=bulk-inserter].json", "book.json"]);
 
-        // TODO: when load is implemented, test that it can load everything back properly.
+        let loaded_json = crate::load::load(&dir.path().join("Untitled"));
+        assert_eq!(loaded_json, json)
     }
 
     #[test]
