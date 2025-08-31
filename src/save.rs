@@ -5,6 +5,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::blueprint::BlueprintType;
+
 fn format_tag(
     typ: &str,
     name: Option<&serde_json::Value>,
@@ -48,98 +50,87 @@ fn unique_strings(iter: impl Iterator<Item = String>) -> impl Iterator<Item = St
 
 fn compute_name(json: &serde_json::Value) -> String {
     let mut name = String::new();
-    if let Some(thing) = json
-        .get("blueprint")
-        .or(json.get("blueprint_book"))
-        .or(json.get("upgrade_planner"))
-        .or(json.get("deconstruction_planner"))
+    let bp = BlueprintType::<&serde_json::Value>::new(json);
+    if let Some(label) = bp.label() {
+        name = label.to_owned();
+    } else if let Some(icons) = bp.any().get("icons").or(bp
+        .any()
+        .get("settings")
+        .and_then(|settings| settings.get("icons")))
+        && let Some(icons) = icons.as_array()
     {
-        if let Some(label) = thing.get("label")
-            && let Some(label) = label.as_str()
-        {
-            name = label.to_owned();
-        } else if let Some(icons) = thing.get("icons").or(thing
-            .get("settings")
-            .and_then(|settings| settings.get("icons")))
-            && let Some(icons) = icons.as_array()
-        {
-            for icon in icons {
-                if let Some(signal) = icon.get("signal")
-                    && let Some(signal_name) = format_icon_tag(signal)
-                {
-                    if !name.is_empty() {
-                        name.push(' ');
-                    }
-                    name.push_str(&signal_name);
-                }
-            }
-        } else if let Some(blueprint) = json.get("deconstruction_planner")
-            && let Some(settings) = blueprint.get("settings")
-        {
-            let entities = settings.get("entity_filters");
-            let entities = entities
-                .iter()
-                .flat_map(|e| e.as_array())
-                .flatten()
-                .flat_map(format_entity_tag);
-
-            let tiles = settings.get("tile_filters");
-            let tiles = tiles
-                .iter()
-                .flat_map(|e| e.as_array())
-                .flatten()
-                .flat_map(format_tile_tag);
-
-            let mut iter = entities.chain(tiles).fuse();
-
-            for name_part in (&mut iter).take(4) {
+        for icon in icons {
+            if let Some(signal) = icon.get("signal")
+                && let Some(signal_name) = format_icon_tag(signal)
+            {
                 if !name.is_empty() {
                     name.push(' ');
                 }
-                name.push_str(&name_part);
+                name.push_str(&signal_name);
             }
-            if iter.next().is_some() {
-                name.push('…');
-            }
-        } else if let Some(blueprint) = json.get("upgrade_planner")
-            && let Some(settings) = blueprint.get("settings")
-            && let Some(mappers) = settings.get("mappers")
-            && let Some(mappers) = mappers.as_array()
-        {
-            let mut iter = unique_strings(
-                mappers
-                    .iter()
-                    .flat_map(|mapper| mapper.get("to"))
-                    .flat_map(|to| {
-                        let typ = to.get("type");
-                        if let Some(typ) = typ
-                            && let Some(typ) = typ.as_str()
-                            && let Some(name_part) =
-                                format_tag(typ, to.get("name"), to.get("quality"))
-                        {
-                            Some(name_part)
-                        } else if let Some(name_part) = to.get("name")
-                            && let Some(name_part) = name_part.as_str()
-                        {
-                            Some(name_part.to_owned())
-                        } else {
-                            None
-                        }
-                    }),
-            )
-            .fuse();
-            for name_part in (&mut iter).take(4) {
-                if !name.is_empty() {
-                    name.push(' ');
-                }
-                name.push_str(&name_part);
-            }
-            if iter.next().is_some() {
-                name.push('…');
-            }
+        }
+    } else if let Some(blueprint) = json.get("deconstruction_planner")
+        && let Some(settings) = blueprint.get("settings")
+    {
+        let entities = settings.get("entity_filters");
+        let entities = entities
+            .iter()
+            .flat_map(|e| e.as_array())
+            .flatten()
+            .flat_map(format_entity_tag);
+
+        let tiles = settings.get("tile_filters");
+        let tiles = tiles
+            .iter()
+            .flat_map(|e| e.as_array())
+            .flatten()
+            .flat_map(format_tile_tag);
+
+        let mut iter = entities.chain(tiles).fuse();
+
+        for name_part in (&mut iter).take(4) {
             if !name.is_empty() {
-                name = format!("Upgrade {name}");
+                name.push(' ');
             }
+            name.push_str(&name_part);
+        }
+        if iter.next().is_some() {
+            name.push('…');
+        }
+    } else if let Some(blueprint) = json.get("upgrade_planner")
+        && let Some(settings) = blueprint.get("settings")
+        && let Some(mappers) = settings.get("mappers")
+        && let Some(mappers) = mappers.as_array()
+    {
+        let mut iter = unique_strings(mappers.iter().flat_map(|mapper| mapper.get("to")).flat_map(
+            |to| {
+                let typ = to.get("type");
+                if let Some(typ) = typ
+                    && let Some(typ) = typ.as_str()
+                    && let Some(name_part) = format_tag(typ, to.get("name"), to.get("quality"))
+                {
+                    Some(name_part)
+                } else if let Some(name_part) = to.get("name")
+                    && let Some(name_part) = name_part.as_str()
+                {
+                    Some(name_part.to_owned())
+                } else {
+                    None
+                }
+            },
+        ))
+        .fuse();
+        for name_part in (&mut iter).take(4) {
+            if !name.is_empty() {
+                name.push(' ');
+            }
+            name.push_str(&name_part);
+        }
+        if iter.next().is_some() {
+            name.push('…');
+        }
+        if !name.is_empty() {
+            name = format!("Upgrade {name}");
         }
     }
 
