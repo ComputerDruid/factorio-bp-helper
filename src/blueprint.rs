@@ -52,6 +52,27 @@ pub(crate) enum BlueprintType<T: Borrow<serde_json::Value>> {
     DeconstructionPlanner(T),
 }
 
+impl BlueprintType<&serde_json::Value> {
+    pub fn new(json: &serde_json::Value) -> BlueprintType<&serde_json::Value> {
+        let json = match json {
+            serde_json::Value::Object(json) => json,
+            _ => panic!("blueprint entry should be an object, got {json:?}"),
+        };
+
+        if json.contains_key("blueprint") {
+            BlueprintType::Blueprint(&json["blueprint"])
+        } else if json.contains_key("blueprint_book") {
+            BlueprintType::BlueprintBook(&json["blueprint_book"])
+        } else if json.contains_key("upgrade_planner") {
+            BlueprintType::UpgradePlanner(&json["upgrade_planner"])
+        } else if json.contains_key("deconstruction_planner") {
+            BlueprintType::DeconstructionPlanner(&json["deconstruction_planner"])
+        } else {
+            panic!("blueprint has unknown type: {:?}", json.keys());
+        }
+    }
+}
+
 impl BlueprintType<&mut serde_json::Value> {
     pub fn new(json: &mut serde_json::Value) -> BlueprintType<&mut serde_json::Value> {
         let json = match json {
@@ -92,6 +113,22 @@ impl BlueprintType<&mut serde_json::Value> {
             panic!("expected description to be a string")
         };
         *description = set_tag_in_string(mem::take(description), tag, value);
+    }
+}
+
+impl<T: Borrow<serde_json::Value>> BlueprintType<T> {
+    pub(crate) fn any(&self) -> &serde_json::Value {
+        match self {
+            BlueprintType::Blueprint(value) => value,
+            BlueprintType::BlueprintBook(value) => value,
+            BlueprintType::UpgradePlanner(value) => value,
+            BlueprintType::DeconstructionPlanner(value) => value,
+        }
+        .borrow()
+    }
+
+    pub(crate) fn label(&self) -> Option<&str> {
+        self.any().get("label")?.as_str()
     }
 }
 

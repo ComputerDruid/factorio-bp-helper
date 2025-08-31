@@ -107,7 +107,7 @@ pub(crate) fn stamp(json: &mut serde_json::Value, path: &Path) {
     let id = repo
         .head_id()
         .unwrap_or_else(|e| panic!("error: couldn't get HEAD commit: {e}"));
-    let mut bp = blueprint::BlueprintType::new(json);
+    let mut bp = blueprint::BlueprintType::<&mut serde_json::Value>::new(json);
     bp.set_tag_in_description("last_commit", &format!("{id}"));
 }
 
